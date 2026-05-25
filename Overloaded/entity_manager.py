@@ -2,7 +2,7 @@ import pygame
 import random
 from Enemy import Enemy
 
-class Entity_Manager:
+class EntityManager:
     def __init__(self, game):
         self.game = game
         self.enemies_list = []
@@ -75,11 +75,15 @@ class Entity_Manager:
             enemy.update(dt, target=self.game.player)
             self.game.resolve_entity_wall_collision(enemy, self.game.walls)
 
-    def resolve_enemy_collisions(self):
-        for i in range(len(self.enemies_list)):
-            for j in range(i + 1, len(self.enemies_list)):
-                enemy1 = self.enemies_list[i]
-                enemy2 = self.enemies_list[j]
+    def resolve_enemy_collisions(self, enemies_list=None):
+        """Prevent enemies from overlapping. Can take a custom enemies_list or use self.enemies_list."""
+        if enemies_list is None:
+            enemies_list = self.enemies_list
+        
+        for i in range(len(enemies_list)):
+            for j in range(i + 1, len(enemies_list)):
+                enemy1 = enemies_list[i]
+                enemy2 = enemies_list[j]
                 if enemy1.rect.colliderect(enemy2.rect):
                     dx = enemy1.pos.x - enemy2.pos.x
                     dy = enemy1.pos.y - enemy2.pos.y
@@ -93,9 +97,16 @@ class Entity_Manager:
                         enemy2.pos.x -= dx * push_distance
                         enemy2.pos.y -= dy * push_distance
 
-    def handle_enemy_player_damage(self):
-        player_hitbox = self.game.player.hitbox
-        if not self.game.network.is_connected:
+    def handle_enemy_player_damage(self, player_list=None):
+        """Handle enemy-player collisions. Can work with client (single player) or server (multiple players).
+        
+        Args:
+            player_list: Optional list of player objects/data. If None, uses game.player (client mode).
+                        Format can be: [player_obj, ...] or [{'rect': rect, 'pos': pos}, ...]
+        """
+        if not self.game.network.is_connected and player_list is None:
+            # Client mode - single player
+            player_hitbox = self.game.player.hitbox
             for enemy in list(self.enemies_list):
                 if enemy.rect.colliderect(player_hitbox):
                     if self.game.player.receive_damage(getattr(enemy, "contact_damage", 15)):
@@ -107,14 +118,15 @@ class Entity_Manager:
                                 enemy.rect.center = (round(enemy.pos.x), round(enemy.pos.y))
                         except Exception:
                             pass
-        else:
+        elif self.game.network.is_connected and player_list is None:
+            # Network mode - remote enemies
             for eid, enemy in list(self.game.net_enemies.items()):
                 try:
                     try:
                         enemy.update_rect_positions()
                     except Exception:
                         pass
-                    if enemy.rect.colliderect(player_hitbox):
+                    if enemy.rect.colliderect(self.game.player.hitbox):
                         if self.game.player.receive_damage(getattr(enemy, "contact_damage", 15)):
                             try:
                                 push_direction = pygame.Vector2(enemy.rect.center) - pygame.Vector2(self.game.player.pos)
@@ -126,6 +138,33 @@ class Entity_Manager:
                                 pass
                 except Exception:
                     pass
+        else:
+            # Server mode or custom player list provided
+            if player_list is None:
+                return
+            
+            # Work with provided player list (for server)
+            for enemy in self.enemies_list:
+                for player_data in player_list:
+                    # Handle both object and dict formats
+                    if hasattr(player_data, 'rect'):
+                        player_rect = player_data.rect
+                    elif isinstance(player_data, dict) and 'rect' in player_data:
+                        player_rect = player_data['rect']
+                    elif isinstance(player_data, dict):
+                        # Create rect from position
+                        x = player_data.get('x', 0)
+                        y = player_data.get('y', 0)
+                        player_rect = pygame.Rect(x - 18, y - 18, 36, 36)
+                    else:
+                        continue
+                    
+                    if enemy.rect.colliderect(player_rect):
+                        # For server, just mark that collision happened
+                        # Server will handle damage separately
+                        if isinstance(player_data, dict):
+                            damage = getattr(enemy, 'contact_damage', 10)
+                            player_data['health'] = max(0, player_data.get('health', 100) - damage)
 
     def update_beam_timers(self, dt):
         for beam in list(self.active_beams):

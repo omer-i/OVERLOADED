@@ -35,12 +35,6 @@ class AuthManager:
                 )
             ''')
             cur.execute('''
-                CREATE TABLE IF NOT EXISTS meta (
-                    k TEXT PRIMARY KEY,
-                    v TEXT
-                )
-            ''')
-            cur.execute('''
                 CREATE TABLE IF NOT EXISTS kills (
                     username TEXT PRIMARY KEY,
                     best_kills_in_game INTEGER DEFAULT 0
@@ -98,18 +92,6 @@ class AuthManager:
             cur.execute('SELECT username FROM users')
             return [r[0] for r in cur.fetchall()]
 
-    def set_last_user(self, username):
-        with self._conn() as c:
-            cur = c.cursor()
-            cur.execute('REPLACE INTO meta(k,v) VALUES(?,?)', ('last_user', username))
-            c.commit()
-
-    def get_last_user(self):
-        with self._conn() as c:
-            cur = c.cursor()
-            cur.execute('SELECT v FROM meta WHERE k=?', ('last_user',))
-            r = cur.fetchone()
-            return r[0] if r else None
 
     def record_game_kills(self, username, kills_in_game):
         """Record kills from a game session. Only updates if it's the best performance."""
@@ -126,10 +108,6 @@ class AuthManager:
                 cur.execute('REPLACE INTO kills(username, best_kills_in_game) VALUES(?, ?)', (username, kills_in_game))
                 c.commit()
     
-    def add_kill(self, username):
-        """Legacy method for backward compatibility. No longer increments."""
-        # This is now a no-op since we track per-game instead of per-kill
-        pass
 
     def get_leaderboard(self, limit=10):
         """Get top users by kill count."""

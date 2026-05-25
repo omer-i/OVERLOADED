@@ -7,6 +7,7 @@ import pygame
 from auth import AuthManager
 from Enemy import Enemy
 from ServerDiscovery import ServerDiscovery
+from entity_manager import EntityManager
 
 class Server:
     def __init__(self, host='0.0.0.0', port=12345, tick_rate=20, host_username=None):
@@ -47,6 +48,20 @@ class Server:
             pygame.Rect(world_width - wall_thickness, 0, wall_thickness, world_height),  # right
             pygame.Rect(1800, 500, 100, 300),  # central obstacle
         ]
+        
+        # ENTITY MANAGER - handles enemy spawning, collisions, etc.
+        # Create a minimal wrapper so EntityManager can work with server
+        class ServerGameWrapper:
+            def __init__(self, server):
+                self.world_bounds = server.world_bounds
+                self.walls = server.walls
+                self.network = type('obj', (object,), {'is_connected': False})()
+                self.net_enemies = {}
+        
+        self.game_wrapper = ServerGameWrapper(self)
+        self.entity_manager = EntityManager(self.game_wrapper)
+        # Point entity_manager's enemies_list to server's enemies (but as list)
+        # We'll manage enemies in self.enemies dict, so we keep entities_list empty for server
         
         # DIFFICULTY PROGRESSION
         self.elapsed_gameplay_time = 0.0
@@ -284,58 +299,11 @@ class Server:
         return pygame.Rect(left, top, right - left, bottom - top)
     
     def spawn_enemy_at_edge(self, viewport_rect, difficulty_multiplier=1.0):
-        """Spawn enemy at edge of viewport (from game.py)."""
-        spawn_margin = 280
-        valid_spawn_positions = []
-        
-        viewport_left = viewport_rect.left
-        viewport_top = viewport_rect.top
-        viewport_right = viewport_rect.right
-        viewport_bottom = viewport_rect.bottom
-        
-        # TOP EDGE
-        spawn_x = random.randint(viewport_left, viewport_right)
-        spawn_y = viewport_top - spawn_margin
-        if self.world_bounds.collidepoint(spawn_x, spawn_y):
-            valid_spawn_positions.append((spawn_x, spawn_y))
-        
-        # RIGHT EDGE
-        spawn_x = viewport_right + spawn_margin
-        spawn_y = random.randint(viewport_top, viewport_bottom)
-        if self.world_bounds.collidepoint(spawn_x, spawn_y):
-            valid_spawn_positions.append((spawn_x, spawn_y))
-        
-        # BOTTOM EDGE
-        spawn_x = random.randint(viewport_left, viewport_right)
-        spawn_y = viewport_bottom + spawn_margin
-        if self.world_bounds.collidepoint(spawn_x, spawn_y):
-            valid_spawn_positions.append((spawn_x, spawn_y))
-        
-        # LEFT EDGE
-        spawn_x = viewport_left - spawn_margin
-        spawn_y = random.randint(viewport_top, viewport_bottom)
-        if self.world_bounds.collidepoint(spawn_x, spawn_y):
-            valid_spawn_positions.append((spawn_x, spawn_y))
-        
-        if not valid_spawn_positions:
-            return None
-        
-        final_spawn_x, final_spawn_y = random.choice(valid_spawn_positions)
-        
-        # Create enemy with difficulty-scaled stats
-        enemy_base_speed = random.randint(60, 120)
-        scaled_speed = int(enemy_base_speed * difficulty_multiplier)
-        scaled_health = int(30 * (difficulty_multiplier ** 1.2))
-        
-        return Enemy(
-            pos=(final_spawn_x, final_spawn_y),
-            patrol_points=[(final_spawn_x, final_spawn_y)],
-            speed=scaled_speed,
-            hp=scaled_health
-        )
+        """Spawn enemy at edge of viewport using EntityManager."""
+        return self.entity_manager.spawn_enemy_at_edge(viewport_rect, self.world_bounds, difficulty_multiplier)
     
     def resolve_entity_wall_collision(self, entity, walls_list):
-        """Resolve collision between entity and walls (from game.py)."""
+        """Resolve collision between entity and walls."""
         for wall_rect in walls_list:
             if entity.rect.colliderect(wall_rect):
                 x_overlap = min(
@@ -364,40 +332,16 @@ class Server:
                     entity.rect.center = (round(entity.pos.x), round(entity.pos.y))
     
     def resolve_enemy_collisions(self):
-        """Prevent enemies from overlapping (from game.py)."""
+        """Prevent enemies from overlapping using EntityManager."""
         enemies_list = list(self.enemies.values())
-        for i in range(len(enemies_list)):
-            for j in range(i + 1, len(enemies_list)):
-                enemy1 = enemies_list[i]
-                enemy2 = enemies_list[j]
-                if enemy1.rect.colliderect(enemy2.rect):
-                    dx = enemy1.pos.x - enemy2.pos.x
-                    dy = enemy1.pos.y - enemy2.pos.y
-                    distance = (dx ** 2 + dy ** 2) ** 0.5
-                    if distance > 0:
-                        dx /= distance
-                        dy /= distance
-                        push_distance = 8
-                        enemy1.pos.x += dx * push_distance
-                        enemy1.pos.y += dy * push_distance
-                        enemy2.pos.x -= dx * push_distance
-                        enemy2.pos.y -= dy * push_distance
+        self.entity_manager.resolve_enemy_collisions(enemies_list)
     
     def handle_enemy_player_damage(self):
-        """Check for enemy-player collisions and apply damage."""
-        for cid, player in self.players.items():
-            player_pos = pygame.Vector2(player['x'], player['y'])
-            player_rect = pygame.Rect(player_pos.x - 18, player_pos.y - 18, 36, 36)
-            
-            for eid, enemy in list(self.enemies.items()):
-                if enemy.rect.colliderect(player_rect):
-                    # Apply damage
-                    damage = getattr(enemy, 'contact_damage', 10)
-                    new_health = max(0, player['health'] - damage)
-                    self.players[cid]['health'] = new_health
-                    
-                    if new_health <= 0:
-                        print(f"Server: Player {cid} defeated by enemy {eid}")
+        """Check for enemy-player collisions using EntityManager."""
+        # Convert players dict to list format for EntityManager
+        players_list = list(self.players.values())
+        self.entity_manager.enemies_list = list(self.enemies.values())
+        self.entity_manager.handle_enemy_player_damage(players_list)
 
     def _game_loop(self):
         """Main server game loop with sophisticated game logic (from game.py)."""

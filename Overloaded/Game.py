@@ -8,7 +8,7 @@ from Player import Player
 from Enemy import Enemy
 from network_manager import NetworkManager
 from lobby import Lobby
-from entity_manager import Entity_Manager
+from entity_manager import EntityManager
 import threading
 import ui_theme
 from auth import AuthManager
@@ -65,7 +65,7 @@ class Game:
             pygame.Rect(1800, 500, 100, 300),
         ]
 
-        self.world = Entity_Manager(self)
+        self.entitymanager = EntityManager(self)
 
         # COMBAT SYSTEM
         self.shoot_cooldown_max = 0.6  # Cooldown between shots in seconds
@@ -107,9 +107,9 @@ class Game:
             self.screen_size
         )
         for _ in range(3):
-            new_enemy = self.world.spawn_enemy_at_edge(initial_camera_rect, self.world_bounds, 1.0)
+            new_enemy = self.entitymanager.spawn_enemy_at_edge(initial_camera_rect, self.world_bounds, 1.0)
             if new_enemy:
-                self.world.enemies_list.append(new_enemy)
+                self.entitymanager.enemies_list.append(new_enemy)
 
     def load_high_score_from_registry(self):
         """Load high score from Windows registry. Returns 0.0 if not found."""
@@ -306,14 +306,14 @@ class Game:
         
         # propagate spawn interval to world
         try:
-            self.world.spawn_interval_current = current_spawn_interval
+            self.entitymanager.spawn_interval_current = current_spawn_interval
         except Exception:
             pass
         return speed_multiplier, current_spawn_interval
 
     def handle_enemy_spawning(self, dt, camera_rect, difficulty_multiplier):
         """GAME LOGIC: Spawn new enemies over time."""
-        self.world.handle_enemy_spawning(dt, camera_rect, difficulty_multiplier)
+        self.entitymanager.handle_enemy_spawning(dt, camera_rect, difficulty_multiplier)
 
     def handle_player_shooting(self, dt, camera_offset):
         """GAME LOGIC: Handle player shooting beam attacks."""
@@ -346,7 +346,7 @@ class Game:
             )
 
             # Damage all local enemies the beam hits
-            for enemy in list(self.world.enemies_list):
+            for enemy in list(self.entitymanager.enemies_list):
                 try:
                     collision_rect = enemy.get_collision_rect()
                     if collision_rect.clipline(
@@ -356,7 +356,7 @@ class Game:
                         enemy.take_damage(self.beam_damage)
                         if not enemy.is_alive():
                             try:
-                                self.world.enemies_list.remove(enemy)
+                                self.entitymanager.enemies_list.remove(enemy)
                                 # Increment kill counter for this game session
                                 self.kills_this_game += 1
                             except ValueError:
@@ -373,7 +373,7 @@ class Game:
                     pass
 
             # Add beam visualization
-            self.world.active_beams.append({
+            self.entitymanager.active_beams.append({
                 "start": beam_origin,
                 "end": beam_end_clipped,
                 "time_to_live": 0.12,
@@ -391,19 +391,19 @@ class Game:
 
     def update_enemies(self, dt, difficulty_multiplier):
         """GAME LOGIC: Update all enemies - movement, animation, collisions."""
-        self.world.update_enemies(dt, difficulty_multiplier)
+        self.entitymanager.update_enemies(dt, difficulty_multiplier)
 
     def resolve_enemy_collisions(self):
         """GAME LOGIC: Prevent enemies from overlapping by pushing them apart."""
-        self.world.resolve_enemy_collisions()
+        self.entitymanager.resolve_enemy_collisions()
 
     def handle_enemy_player_damage(self):
         """GAME LOGIC: Check for enemy-player collisions and apply damage."""
-        self.world.handle_enemy_player_damage()
+        self.entitymanager.handle_enemy_player_damage()
 
     def update_beam_timers(self, dt):
         """GAME LOGIC: Decrease beam TTL and remove expired beams."""
-        self.world.update_beam_timers(dt)
+        self.entitymanager.update_beam_timers(dt)
 
     def check_game_over_condition(self):
         """GAME LOGIC: Check if player died and return true if so."""
@@ -453,7 +453,7 @@ class Game:
             pygame.draw.rect(self.screen, (255, 255, 0), player_center_hitbox_screen, 2)
 
             # --- Enemy rects ---
-            for enemy in self.world.enemies_list:
+            for enemy in self.entitymanager.enemies_list:
                 enemy_rect_screen = enemy.rect.move(-camera_offset.x, -camera_offset.y)
                 pygame.draw.rect(self.screen, (0, 255, 0), enemy_rect_screen, 2)
 
@@ -488,7 +488,7 @@ class Game:
                 except Exception:
                     pass
         else:
-            for enemy in self.world.enemies_list:
+            for enemy in self.entitymanager.enemies_list:
                 enemy_screen_position = enemy.render_rect.move(-camera_offset.x, -camera_offset.y)
                 self.screen.blit(enemy.image, enemy_screen_position)
 
@@ -524,7 +524,7 @@ class Game:
                     pass
 
         # RENDERING: Draw beams with glow effect (bright outer layer + core)
-        for beam in self.world.active_beams:
+        for beam in self.entitymanager.active_beams:
             beam_start_screen = (
                 round(beam["start"].x - camera_offset.x),
                 round(beam["start"].y - camera_offset.y)
@@ -554,7 +554,7 @@ class Game:
         self.screen.blit(health_text, (10, 10))
         
         # Enemy count display (show authoritative count when connected)
-        enemy_count = len(self.net_enemies) if self.network.is_connected else len(self.world.enemies_list)
+        enemy_count = len(self.net_enemies) if self.network.is_connected else len(self.entitymanager.enemies_list)
         enemy_count_text = hud_font.render(
             f"Enemies: {enemy_count}",
             True,
@@ -575,7 +575,7 @@ class Game:
     def reset_game(self):
         """GAME LOGIC: Reset all gameplay state for a fresh game."""
         # Reset world entities
-        self.world.reset()
+        self.entitymanager.reset()
         
         # Reset combat timers
         self.shoot_cooldown_timer = 0.0
@@ -600,14 +600,14 @@ class Game:
             self.screen_size
         )
         for _ in range(3):
-            new_enemy = self.world.spawn_enemy_at_edge(
+            new_enemy = self.entitymanager.spawn_enemy_at_edge(
                 initial_camera_rect,
                 self.world_bounds,
                 1.0
             )
             if new_enemy:
                 if not self.network.is_connected:
-                    self.world.enemies_list.append(new_enemy)
+                    self.entitymanager.enemies_list.append(new_enemy)
 
     def run(self):
         """MAIN GAME LOOP: Handle menu/game state and coordinate all game systems."""

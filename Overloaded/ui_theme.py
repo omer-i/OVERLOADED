@@ -1,7 +1,6 @@
 import pygame
 
 # Centralized UI theme for consistent look across screens
-# Colors
 BG = (18, 20, 34)
 PANEL = (28, 32, 46)
 ACCENT = (180, 220, 255)
