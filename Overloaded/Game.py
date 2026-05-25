@@ -6,22 +6,24 @@ import time
 import winreg
 from Player import Player
 from Enemy import Enemy
-from Server import Server
-from Client import Client
 from network_manager import NetworkManager
 from lobby import Lobby
-from world import World
+from entity_manager import Entity_Manager
 import threading
 import ui_theme
 from auth import AuthManager
+from PIL import Image
 
 class Game:
     def __init__(self):
         pygame.init()
 
         pygame.display.set_caption("Overloaded")
-        _icon_path = os.path.join(os.path.dirname(__file__), "Overloaded Icon.png")
-        pygame.display.set_icon(pygame.image.load(_icon_path))
+        _icon_path = os.path.join(os.path.dirname(__file__), "overloaded.ico")
+        from PIL import Image
+        _pil_img = Image.open(_icon_path).convert("RGBA")
+        _icon_surface = pygame.image.fromstring(_pil_img.tobytes(), _pil_img.size, "RGBA")
+        pygame.display.set_icon(_icon_surface)
 
         # DISPLAY SETUP
         self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -63,8 +65,7 @@ class Game:
             pygame.Rect(1800, 500, 100, 300),
         ]
 
-        # ENTITY COLLECTIONS are managed by World
-        self.world = World(self)
+        self.world = Entity_Manager(self)
 
         # COMBAT SYSTEM
         self.shoot_cooldown_max = 0.6  # Cooldown between shots in seconds
