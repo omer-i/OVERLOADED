@@ -30,7 +30,7 @@ class Enemy(pygame.sprite.Sprite):
 		self.is_facing_right = True  # Current facing direction
 		self.load_goblin_sprite()  # Load sprite sheet and extract frames
 
-		# Set initial image based on loaded frames
+		
 		if self.animation_frames:
 			self.image = self.animation_frames[0]
 		else:

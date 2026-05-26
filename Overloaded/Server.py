@@ -35,7 +35,7 @@ class Server:
         self.game_started = False
         
         # WORLD SETUP - same as game.py
-        self.world_dimensions = (3120, 2340)  # 1.3x and 1.5x of typical screen
+        self.world_dimensions = (3120, 2340)
         self.world_bounds = pygame.Rect(0, 0, self.world_dimensions[0], self.world_dimensions[1])
         
         # WALLS - same as game.py
@@ -247,7 +247,7 @@ class Server:
             print(f"Server: Client {cid} disconnected")
     
     # ============================================================================
-    # GAME LOGIC METHODS (from game.py)
+    # GAME LOGIC METHODS
     # ============================================================================
     
     def update_difficulty(self, dt):
