@@ -62,12 +62,13 @@ if %errorLevel% equ 0 (
     for /f "tokens=*" %%V in ('"%PYTHON%" -c "import pygame; print(pygame.version.ver)"') do echo         Already installed: pygame %%V
 ) else (
     echo         Not found. Installing pygame...
-    "%PYTHON%" -m pip install --upgrade pip --quiet 2>nul
+    "%PYTHON%" -m pip install --upgrade pip setuptools wheel --quiet 2>nul
     "%PYTHON%" -m pip install -r "%SRC%\requirements.txt" --quiet
     if errorlevel 1 (
-        echo  ERROR: Failed to install required packages.
-        pause
-        exit /b 1
+        echo Requirements failed, trying pygame directly...
+    "%PYTHON%" -m pip install pygame
+
+        
     )
     echo         Done.
 )
