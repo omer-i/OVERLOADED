@@ -99,7 +99,6 @@ class Player(pygame.sprite.Sprite):
 				ROWS = 7
 				FRAMES_PER_ROW = [8, 8, 13, 13, 17, 5, 9]  
 				
-				# --- THE FIX IS HERE ---
 				MAX_COLUMNS = max(FRAMES_PER_ROW) # Finds the longest row (17)
 				FRAME_WIDTH = sheet.get_width() // MAX_COLUMNS # Fixed width for ALL frames
 				FRAME_HEIGHT = sheet.get_height() // ROWS

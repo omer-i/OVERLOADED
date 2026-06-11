@@ -1659,30 +1659,74 @@ class Game:
         
         # Show server selection screen
         if not discovered_servers:
-            # No servers found - show message
-            for _ in range(60):  # Show for ~2 seconds
+            # No servers found - show message with manual IP option
+            btn_w, btn_h = 320, 52
+            btn_manual = pygame.Rect(0, 0, btn_w, btn_h)
+            btn_manual.center = (self.screen_size[0] // 2, self.screen_size[1] // 2 + 20)
+            btn_cancel = pygame.Rect(0, 0, btn_w, btn_h)
+            btn_cancel.center = (self.screen_size[0] // 2, self.screen_size[1] // 2 + 90)
+            selected_btn = 0  # 0 = manual, 1 = cancel
+
+            while True:
                 self.clock.tick(30)
                 self.screen.fill(ui_theme.BG)
-                
+
                 title_surf = self.font_title.render('No Rooms Found', True, ui_theme.ACCENT)
-                title_rect = title_surf.get_rect(center=(self.screen_size[0] // 2, 100))
+                title_rect = title_surf.get_rect(center=(self.screen_size[0] // 2, self.screen_size[1] // 2 - 120))
                 self.screen.blit(title_surf, title_rect)
-                
-                msg_surf = self.font_hud.render('No game servers are currently hosting.', True, ui_theme.TEXT)
-                msg_rect = msg_surf.get_rect(center=(self.screen_size[0] // 2, 200))
+
+                msg_surf = self.font_hud.render('No servers discovered on the network.', True, ui_theme.TEXT)
+                msg_rect = msg_surf.get_rect(center=(self.screen_size[0] // 2, self.screen_size[1] // 2 - 60))
                 self.screen.blit(msg_surf, msg_rect)
-                
-                hint_surf = self.font_small18.render('Try creating a room or check your connection.', True, ui_theme.MUTED)
-                hint_rect = hint_surf.get_rect(center=(self.screen_size[0] // 2, 280))
+
+                hint_surf = self.font_small18.render('You can enter the host IP address manually instead.', True, ui_theme.MUTED)
+                hint_rect = hint_surf.get_rect(center=(self.screen_size[0] // 2, self.screen_size[1] // 2 - 30))
                 self.screen.blit(hint_surf, hint_rect)
-                
+
+                # Manual IP button
+                mx, my = pygame.mouse.get_pos()
+                hover_manual = btn_manual.collidepoint(mx, my)
+                hover_cancel = btn_cancel.collidepoint(mx, my)
+                if hover_manual: selected_btn = 0
+                if hover_cancel: selected_btn = 1
+
+                pygame.draw.rect(self.screen, ui_theme.HIGHLIGHT if selected_btn == 0 else ui_theme.PANEL, btn_manual, border_radius=8)
+                pygame.draw.rect(self.screen, ui_theme.ACCENT, btn_manual, 2, border_radius=8)
+                manual_surf = self.font_hud.render('Enter IP Manually', True, ui_theme.BG if selected_btn == 0 else ui_theme.TEXT)
+                manual_rect = manual_surf.get_rect(center=btn_manual.center)
+                self.screen.blit(manual_surf, manual_rect)
+
+                # Cancel button
+                pygame.draw.rect(self.screen, ui_theme.HIGHLIGHT if selected_btn == 1 else ui_theme.PANEL, btn_cancel, border_radius=8)
+                pygame.draw.rect(self.screen, ui_theme.ACCENT, btn_cancel, 2, border_radius=8)
+                cancel_surf = self.font_hud.render('Cancel', True, ui_theme.BG if selected_btn == 1 else ui_theme.TEXT)
+                cancel_rect = cancel_surf.get_rect(center=btn_cancel.center)
+                self.screen.blit(cancel_surf, cancel_rect)
+
                 pygame.display.flip()
-                
+
                 for event in pygame.event.get():
-                    if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                    if event.type == pygame.QUIT:
                         return None
-            
-            return None
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            return None
+                        if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
+                            selected_btn = 1 - selected_btn  # toggle between 0 and 1
+                        if event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                            if selected_btn == 0:
+                                ip = self.prompt_text_input('Enter Host IP Address:')
+                                if ip:
+                                    return {'ip': ip.strip(), 'port': 12345}
+                            else:
+                                return None
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        if btn_manual.collidepoint(event.pos):
+                            ip = self.prompt_text_input('Enter Host IP Address:')
+                            if ip:
+                                return {'ip': ip.strip(), 'port': 12345}
+                        elif btn_cancel.collidepoint(event.pos):
+                            return None
         
         # Server selection UI
         selected_index = 0
@@ -1746,9 +1790,20 @@ class Game:
                 ip_rect = ip_surf.get_rect(topleft=(x + 16, y + 58))
                 self.screen.blit(ip_surf, ip_rect)
             
+            # Manual IP button at bottom left
+            btn_w, btn_h = 220, 40
+            manual_btn = pygame.Rect(40, self.screen_size[1] - 70, btn_w, btn_h)
+            mx, my = pygame.mouse.get_pos()
+            hover_manual = manual_btn.collidepoint(mx, my)
+            pygame.draw.rect(self.screen, ui_theme.HIGHLIGHT if hover_manual else ui_theme.PANEL, manual_btn, border_radius=6)
+            pygame.draw.rect(self.screen, ui_theme.ACCENT, manual_btn, 2, border_radius=6)
+            manual_surf = self.font_small.render('Enter IP Manually', True, ui_theme.BG if hover_manual else ui_theme.TEXT)
+            manual_rect = manual_surf.get_rect(center=manual_btn.center)
+            self.screen.blit(manual_surf, manual_rect)
+
             # Instructions
-            instr_y = self.screen_size[1] - 100
-            instr1_surf = self.font_small18.render('UP/DOWN: Select Room | ENTER: Join | ESC: Cancel', True, ui_theme.MUTED)
+            instr_y = self.screen_size[1] - 50
+            instr1_surf = self.font_small18.render('UP/DOWN: Select | ENTER: Join | ESC: Cancel', True, ui_theme.MUTED)
             instr1_rect = instr1_surf.get_rect(center=(self.screen_size[0] // 2, instr_y))
             self.screen.blit(instr1_surf, instr1_rect)
             
@@ -1770,18 +1825,28 @@ class Game:
                         selected_index = min(len(discovered_servers) - 1, selected_index + 1)
                     
                     if event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
-                        # Join selected server
                         return discovered_servers[selected_index]
+
+                    if event.key == pygame.K_i:
+                        # I key as shortcut for manual IP
+                        ip = self.prompt_text_input('Enter Host IP Address:')
+                        if ip:
+                            return {'ip': ip.strip(), 'port': 12345}
                 
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:  # Left click
+                    if event.button == 1:
+                        # Check manual IP button
+                        if manual_btn.collidepoint(event.pos):
+                            ip = self.prompt_text_input('Enter Host IP Address:')
+                            if ip:
+                                return {'ip': ip.strip(), 'port': 12345}
+                        # Check server list
                         for rect, idx in server_rects:
                             if rect.collidepoint(event.pos):
                                 selected_index = idx
                                 return discovered_servers[idx]
                 
                 if event.type == pygame.MOUSEMOTION:
-                    # Update selection on mouse hover
                     for rect, idx in server_rects:
                         if rect.collidepoint(event.pos):
                             selected_index = idx
