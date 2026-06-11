@@ -62,13 +62,13 @@ class ServerDiscovery:
         return thread
     
     @staticmethod
-    def discover_servers(timeout=2.0, discovery_port=DISCOVERY_PORT):
+    def discover_servers(timeout=2.0, discovery_port=DISCOVERY_PORT, broadcast_address=BROADCAST_ADDRESS):
         """Broadcast discovery request and collect available servers.
         
         Args:
             timeout: How long to wait for responses (in seconds)
             discovery_port: The UDP port to broadcast on
-            
+            broadcast_address: The broadcast address to use
         Returns:
             List of discovered servers: [{'hostname': str, 'port': int, 'players': int, ...}, ...]
         """
@@ -81,7 +81,7 @@ class ServerDiscovery:
             sock.settimeout(0.5)
             
             # Send discovery broadcast
-            broadcast_addr = ('255.255.255.255', discovery_port)
+            broadcast_addr = (broadcast_address, discovery_port)
             sock.sendto(ServerDiscovery.DISCOVERY_REQUEST.encode('utf-8'), broadcast_addr)
             
             # Collect responses
